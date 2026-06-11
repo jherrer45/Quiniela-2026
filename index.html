@@ -744,7 +744,7 @@ async function fetchResults() {
   setStatus('loading', 'Consultando resultados del Mundial…');
   try {
     // La API key va en la URL → allorigins hace el fetch server-side, sin CORS
-    const apiUrl = `https://api.football-data.org/v4/competitions/${WC_ID}/matches?stage=GROUP_STAGE&auth=${API_KEY}`;
+    const apiUrl = `https://api.football-data.org/v4/competitions/${WC_ID}/matches?auth=${API_KEY}`;
     const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(apiUrl)}`;
 
     let data = null;
@@ -878,7 +878,7 @@ function renderRanking() {
     return `
     <tr class="${posClass}">
       <td><span class="pos-badge ${badgeCls}">${pos+1}</span></td>
-      <td><span class="player-name">${s.nombre}</span></td>
+      <td><span class="player-name player-link" onclick="goToQuiniela('${s.nombre.replace(/'/g,"\\'")}')">${s.nombre}</span></td>
       <td><span class="pts-total">${s.total}</span></td>
       <td class="hide-mobile"><span class="badge-pts badge-exact">${s.ptsExact}</span></td>
 
@@ -1148,7 +1148,7 @@ function renderTodos() {
     b.classList.toggle('active', b.textContent===(todosGrp==='ALL'?'Todos':todosGrp));
   });
 
-  // Orden de participantes: por puntos desc
+  // Participantes ordenados por puntos
   const ordered = QUINIELAS
     .map((q,j) => {
       let tot=0;
@@ -1159,61 +1159,62 @@ function renderTodos() {
         let p=sr===sq?3:0; if(rl===ql)p+=1; if(rv===qv)p+=1; if(rl===ql&&rv===qv)p+=1;
         tot+=p;
       }
-      return {q, tot, j};
+      return {q, tot};
     })
     .sort((a,b)=>b.tot-a.tot);
 
-  // THEAD — nombres de participantes (vertical)
+  // Partidos filtrados
+  const partsFilt = PARTIDOS
+    .map((p,i)=>({...p,i}))
+    .filter(p => todosGrp==='ALL' || p.g===todosGrp);
+
   const thead = document.getElementById('todos-thead');
-  let thRow = `<tr><th class="th-partido">Partido / Resultado</th>`;
-  ordered.forEach(({q}) => {
-    thRow += `<th class="th-part-name" onclick="goToQuiniela('${q.n.replace(/'/g,"\'")}')">
-      ${q.n}
+  const tbody = document.getElementById('todos-tbody');
+
+  // ── THEAD: fila fija con "Participante | Pts | partido1 | partido2 ..." ──
+  let thRow = `<tr>
+    <th class="th-partido" style="min-width:160px;text-align:left">Participante</th>
+    <th class="th-partido" style="min-width:40px;text-align:center">Pts</th>`;
+  partsFilt.forEach(p => {
+    const r   = results[p.i];
+    const res = (r && r.gl!==null) ? `${r.gl}-${r.gv}` : 'pend.';
+    const resColor = (r && r.gl!==null) ? 'color:var(--green)' : 'color:var(--muted)';
+    thRow += `<th style="background:var(--surface);padding:4px 3px;min-width:52px;text-align:center;border:1px solid var(--border)">
+      <div style="font-size:9px;color:var(--gold);font-weight:700">G${p.g}</div>
+      <div style="font-size:8px;color:var(--subtext);line-height:1.2">${ABREV[p.loc]||p.loc.slice(0,3).toUpperCase()}</div>
+      <div style="font-size:8px;color:var(--subtext);line-height:1.2">${ABREV[p.vis]||p.vis.slice(0,3).toUpperCase()}</div>
+      <div style="font-size:9px;font-weight:700;${resColor}">${res}</div>
     </th>`;
   });
   thRow += '</tr>';
   thead.innerHTML = thRow;
 
-  // TBODY — filas de partidos
-  const partsFiltrados = PARTIDOS
-    .map((p,i)=>({...p,i}))
-    .filter(p => todosGrp==='ALL' || p.g===todosGrp);
-
-  const tbody = document.getElementById('todos-tbody');
+  // ── TBODY: una fila por participante ──────────────────────────────
   let rows = '';
-  let prevGrp = null;
-
-  partsFiltrados.forEach(p => {
-    const i = p.i;
-    const r = results[i];
-    const isPlayed = r && r.gl !== null;
-
-    // Separador de grupo
-    if (p.g !== prevGrp) {
-      prevGrp = p.g;
-      rows += `<tr class="tr-sep"><td colspan="${ordered.length+1}">Grupo ${p.g}</td></tr>`;
-    }
-
-    // Resultado real
-    const realStr = isPlayed
-      ? `<span class="td-real">${r.gl}-${r.gv}</span>`
-      : `<span class="td-real pend">pend.</span>`;
-
+  ordered.forEach(({q, tot}) => {
+    const alt = ordered.indexOf(ordered.find(x=>x.q===q)) % 2;
+    const bg  = alt ? 'background:var(--dark,#111827)' : 'background:var(--card,#1A2235)';
     let row = `<tr>
-      <td class="td-partido">
-        <span class="td-grp">G${p.g}</span>${p.loc} – ${p.vis}${realStr}
+      <td class="td-partido" style="cursor:pointer;${bg}" onclick="goToQuiniela('${q.n.replace(/'/g,"\'")}')">
+        ${q.n}
+      </td>
+      <td style="text-align:center;font-family:'Bebas Neue',sans-serif;font-size:1.1rem;
+                 color:var(--gold);padding:5px 6px;border:1px solid var(--border);${bg}">
+        ${tot}
       </td>`;
 
-    ordered.forEach(({q}) => {
+    partsFilt.forEach(p => {
+      const i = p.i;
+      const r = results[i];
       const [ql,qv] = q.p[i];
       const pred = `${ql}-${qv}`;
       let cls = 'noplay';
-      if (isPlayed) {
+      if (r && r.gl!==null) {
         const rl=r.gl,rv=r.gv;
         if(ql===rl&&qv===rv) cls='exact';
         else {
           const sr=(rl>rv)-(rl<rv),sq=(ql>qv)-(ql<qv);
-          cls = (sr===sq||rl===ql||rv===qv) ? 'parcial' : 'wrong';
+          cls=(sr===sq||rl===ql||rv===qv)?'parcial':'wrong';
         }
       } else { cls='pend'; }
       row += `<td class="td-score ${cls}">${pred}</td>`;
@@ -1225,6 +1226,22 @@ function renderTodos() {
 
   tbody.innerHTML = rows;
 }
+
+// Mapa abreviaciones para la tabla Todos
+const ABREV = {
+  "Corea del Sur":"KOR","Rep. Checa":"CZE","México":"MEX","Sudáfrica":"RSA",
+  "Canadá":"CAN","Bosnia-Herz.":"BIH","EE.UU.":"USA","Paraguay":"PAR",
+  "Qatar":"QAT","Suiza":"SUI","Brasil":"BRA","Marruecos":"MAR",
+  "Haití":"HAI","Escocia":"SCO","Australia":"AUS","Turquía":"TUR",
+  "Alemania":"GER","Curazao":"CUW","Países Bajos":"NED","Japón":"JPN",
+  "Costa de Marfil":"CIV","Ecuador":"ECU","Suecia":"SWE","Túnez":"TUN",
+  "Bélgica":"BEL","Egipto":"EGY","España":"ESP","Cabo Verde":"CPV",
+  "Irán":"IRN","Nueva Zelanda":"NZL","Arabia Saudita":"KSA","Uruguay":"URU",
+  "Francia":"FRA","Senegal":"SEN","Irak":"IRQ","Noruega":"NOR",
+  "Argentina":"ARG","Argelia":"ALG","Portugal":"POR","R.D. del Congo":"COD",
+  "Uzbekistán":"UZB","Colombia":"COL","Inglaterra":"ENG","Croacia":"CRO",
+  "Austria":"AUT","Jordania":"JOR","Ghana":"GHA","Panamá":"PAN",
+};
 
 // ═══════════════════════════════════════════════
 //  ARRANQUE
