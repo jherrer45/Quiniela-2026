@@ -550,15 +550,46 @@ let activeTab = 'ranking';
 async function fetchResults() {
   setStatus('loading', 'Consultando resultados del Mundial…');
   try {
-    // Proxy CORS necesario para llamadas desde browser a football-data.org
     const apiUrl = `https://api.football-data.org/v4/competitions/${WC_ID}/matches?stage=GROUP_STAGE`;
-    const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(apiUrl)}`;
-    const res = await fetch(proxyUrl, {
-      headers: { 'X-Auth-Token': API_KEY }
-    });
-    if (!res.ok) throw new Error(`API error ${res.status}: ${res.statusText}`);
-    const wrapper = await res.json();
-    const data = JSON.parse(wrapper.contents);
+
+    // Intentar llamada directa primero (funciona si el navegador no bloquea CORS)
+    let data = null;
+    const proxies = [
+      // Llamada directa con header
+      async () => {
+        const r = await fetch(apiUrl, { headers: { 'X-Auth-Token': API_KEY } });
+        if (!r.ok) throw new Error(r.status);
+        return r.json();
+      },
+      // Proxy corsproxy.io
+      async () => {
+        const r = await fetch(`https://corsproxy.io/?${encodeURIComponent(apiUrl)}`, {
+          headers: { 'X-Auth-Token': API_KEY }
+        });
+        if (!r.ok) throw new Error(r.status);
+        return r.json();
+      },
+      // Proxy allorigins
+      async () => {
+        const r = await fetch(`https://api.allorigins.win/get?url=${encodeURIComponent(apiUrl)}`);
+        if (!r.ok) throw new Error(r.status);
+        const w = await r.json();
+        return JSON.parse(w.contents);
+      },
+      // Proxy thingproxy
+      async () => {
+        const r = await fetch(`https://thingproxy.freeboard.io/fetch/${apiUrl}`, {
+          headers: { 'X-Auth-Token': API_KEY }
+        });
+        if (!r.ok) throw new Error(r.status);
+        return r.json();
+      }
+    ];
+
+    for (const tryProxy of proxies) {
+      try { data = await tryProxy(); break; } catch(e) { continue; }
+    }
+    if (!data) throw new Error('Todos los proxies fallaron');
     processMatches(data.matches || []);
     const now = new Date().toLocaleTimeString('es-VE', {hour:'2-digit',minute:'2-digit'});
     setStatus('ok', `Resultados actualizados`);
