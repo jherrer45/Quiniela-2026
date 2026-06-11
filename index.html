@@ -397,9 +397,32 @@
   }
   .todos-legend span { display:flex; align-items:center; gap:5px; }
   .todos-wrap {
-    overflow-x: auto; -webkit-overflow-scrolling: touch;
+    overflow: auto; -webkit-overflow-scrolling: touch;
     border: 1px solid var(--border); border-radius: 8px;
+    max-height: 70vh;
+    position: relative;
   }
+  .todos-wrap::-webkit-scrollbar { height: 12px; width: 12px; }
+  .todos-wrap::-webkit-scrollbar-track { background: var(--surface); }
+  .todos-wrap::-webkit-scrollbar-thumb {
+    background: var(--gold); border-radius: 6px;
+    border: 3px solid var(--surface);
+  }
+  .todos-table thead th { position: sticky; top: 0; z-index: 5; }
+  .todos-table thead th:first-child,
+  .todos-table thead th:nth-child(2) { z-index: 7; }
+  .todos-table tbody td:first-child {
+    position: sticky; left: 0; z-index: 4;
+    min-width: 150px; max-width: 150px; width: 150px;
+  }
+  .todos-table tbody td:nth-child(2) {
+    position: sticky; left: 150px; z-index: 4;
+    background: var(--surface) !important;
+  }
+  .todos-table thead th:first-child {
+    position: sticky; left: 0; min-width: 150px; max-width: 150px; width: 150px;
+  }
+  .todos-table thead th:nth-child(2) { position: sticky; left: 150px; }
   .todos-table {
     border-collapse: collapse; font-size: 11px;
     white-space: nowrap;
@@ -742,38 +765,42 @@ let activeTab = 'ranking';
 // ═══════════════════════════════════════════════
 async function fetchResults() {
   setStatus('loading', 'Consultando resultados del Mundial…');
+  const apiUrl = `https://api.football-data.org/v4/competitions/${WC_ID}/matches`;
+  let data = null;
+  let lastError = '';
+
+  // Método 1: fetch directo con header (football-data v4 soporta CORS)
   try {
-    // La API key va en la URL → allorigins hace el fetch server-side, sin CORS
-    const apiUrl = `https://api.football-data.org/v4/competitions/${WC_ID}/matches?auth=${API_KEY}`;
-    const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(apiUrl)}`;
+    const r = await fetch(apiUrl, { headers: { 'X-Auth-Token': API_KEY } });
+    const j = await r.json();
+    if (j && Array.isArray(j.matches)) data = j;
+    else lastError = j.message || `HTTP ${r.status}`;
+  } catch(e) { lastError = e.message; }
 
-    let data = null;
+  // Método 2: corsproxy.io (formato nuevo ?url=) con header
+  if (!data) {
     try {
-      const r = await fetch(proxyUrl);
-      if (r.ok) {
-        const w = await r.json();
-        if (w && w.contents) data = JSON.parse(w.contents);
-      }
-    } catch(e) {}
+      const r = await fetch(`https://corsproxy.io/?url=${encodeURIComponent(apiUrl)}`, {
+        headers: { 'X-Auth-Token': API_KEY }
+      });
+      const j = await r.json();
+      if (j && Array.isArray(j.matches)) data = j;
+      else lastError = j.message || `HTTP ${r.status}`;
+    } catch(e) { lastError = e.message; }
+  }
 
-    // Fallback: jsonp-style con otro endpoint de allorigins
-    if (!data) {
-      try {
-        const r2 = await fetch(`https://api.allorigins.win/raw?url=${encodeURIComponent(apiUrl)}`);
-        if (r2.ok) data = await r2.json();
-      } catch(e) {}
-    }
-
-    if (!data) throw new Error('No se pudo obtener datos de la API');
-    processMatches(data.matches || []);
+  if (data && Array.isArray(data.matches)) {
+    processMatches(data.matches);
+    const played = results.filter(r=>r&&r.gl!==null).length;
     const now = new Date().toLocaleTimeString('es-VE', {hour:'2-digit',minute:'2-digit'});
-    setStatus('ok', `Resultados actualizados`);
+    setStatus('ok', `Resultados actualizados — ${played} partido${played===1?'':'s'} con marcador`);
     document.getElementById('last-update').textContent = `· Última consulta: ${now}`;
     hideError();
-  } catch(e) {
-    setStatus('err', 'No se pudo conectar con la API');
-    showError(e.message);
-    // Igual renderizamos con los datos que tengamos
+  } else {
+    // Sin datos: todos los partidos quedan pendientes
+    for (let i = 0; i < 72; i++) results[i] = { gl:null, gv:null, status:'SCHEDULED' };
+    setStatus('err', 'No se pudieron obtener los resultados');
+    showError(lastError || 'Error desconocido');
   }
   render();
   document.getElementById('loading').classList.add('hidden');
@@ -1173,7 +1200,7 @@ function renderTodos() {
 
   // ── THEAD: fila fija con "Participante | Pts | partido1 | partido2 ..." ──
   let thRow = `<tr>
-    <th class="th-partido" style="min-width:160px;text-align:left">Participante</th>
+    <th class="th-partido" style="text-align:left">Participante</th>
     <th class="th-partido" style="min-width:40px;text-align:center">Pts</th>`;
   partsFilt.forEach(p => {
     const r   = results[p.i];
