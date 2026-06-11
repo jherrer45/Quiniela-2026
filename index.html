@@ -359,9 +359,6 @@
           <th style="width:40px">#</th>
           <th>Participante</th>
           <th>Pts</th>
-          <th class="hide-mobile">1X2</th>
-          <th class="hide-mobile">Loc</th>
-          <th class="hide-mobile">Vis</th>
           <th class="hide-mobile">Exactos</th>
           <th>Progreso</th>
         </tr>
@@ -553,12 +550,15 @@ let activeTab = 'ranking';
 async function fetchResults() {
   setStatus('loading', 'Consultando resultados del Mundial…');
   try {
-    const res = await fetch(
-      `https://api.football-data.org/v4/competitions/${WC_ID}/matches?stage=GROUP_STAGE`,
-      { headers: { 'X-Auth-Token': API_KEY } }
-    );
+    // Proxy CORS necesario para llamadas desde browser a football-data.org
+    const apiUrl = `https://api.football-data.org/v4/competitions/${WC_ID}/matches?stage=GROUP_STAGE`;
+    const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(apiUrl)}`;
+    const res = await fetch(proxyUrl, {
+      headers: { 'X-Auth-Token': API_KEY }
+    });
     if (!res.ok) throw new Error(`API error ${res.status}: ${res.statusText}`);
-    const data = await res.json();
+    const wrapper = await res.json();
+    const data = JSON.parse(wrapper.contents);
     processMatches(data.matches || []);
     const now = new Date().toLocaleTimeString('es-VE', {hour:'2-digit',minute:'2-digit'});
     setStatus('ok', `Resultados actualizados`);
@@ -676,9 +676,6 @@ function renderRanking() {
       <td><span class="pos-badge ${badgeCls}">${pos+1}</span></td>
       <td><span class="player-name">${s.nombre}</span></td>
       <td><span class="pts-total">${s.total}</span></td>
-      <td class="hide-mobile"><span class="badge-pts badge-1x2">${s.pts1x2}</span></td>
-      <td class="hide-mobile"><span class="badge-pts badge-loc">${s.ptsLoc}</span></td>
-      <td class="hide-mobile"><span class="badge-pts badge-vis">${s.ptsVis}</span></td>
       <td class="hide-mobile"><span class="badge-pts badge-exact">${s.ptsExact}</span></td>
       <td>
         <div class="prog-bar-wrap">
