@@ -763,9 +763,46 @@ let activeTab = 'ranking';
 // ═══════════════════════════════════════════════
 //  FETCH RESULTADOS
 // ═══════════════════════════════════════════════
+const CACHE_KEY = 'quiniela2026_results';
+const CACHE_TTL_MIN = 10;   // minutos de validez del caché
+
+function loadCache() {
+  try {
+    const raw = localStorage.getItem(CACHE_KEY);
+    if (!raw) return null;
+    const c = JSON.parse(raw);
+    if (!c || !Array.isArray(c.matches) || !c.ts) return null;
+    return c;
+  } catch(e) { return null; }
+}
+
+function saveCache(matches) {
+  try {
+    localStorage.setItem(CACHE_KEY, JSON.stringify({ matches, ts: Date.now() }));
+  } catch(e) {}
+}
+
+function fmtTime(ts) {
+  return new Date(ts).toLocaleTimeString('es-VE', {hour:'2-digit', minute:'2-digit'});
+}
+
 async function fetchResults() {
   setStatus('loading', 'Consultando resultados del Mundial…');
   const apiUrl = `https://api.football-data.org/v4/competitions/${WC_ID}/matches`;
+  const cache = loadCache();
+
+  // Caché fresco (< CACHE_TTL_MIN minutos) → usar sin llamar a la API
+  if (cache && (Date.now() - cache.ts) < CACHE_TTL_MIN * 60 * 1000) {
+    processMatches(cache.matches);
+    const played = results.filter(r=>r&&r.gl!==null).length;
+    setStatus('ok', `Resultados actualizados — ${played} partido${played===1?'':'s'} con marcador`);
+    document.getElementById('last-update').textContent = `· Datos de las ${fmtTime(cache.ts)}`;
+    hideError();
+    render();
+    document.getElementById('loading').classList.add('hidden');
+    return;
+  }
+
   let data = null;
   let lastError = '';
 
@@ -777,7 +814,7 @@ async function fetchResults() {
     else lastError = j.message || `HTTP ${r.status}`;
   } catch(e) { lastError = e.message; }
 
-  // Método 2: corsproxy.io (formato nuevo ?url=) con header
+  // Método 2: corsproxy.io con header
   if (!data) {
     try {
       const r = await fetch(`https://corsproxy.io/?url=${encodeURIComponent(apiUrl)}`, {
@@ -790,14 +827,22 @@ async function fetchResults() {
   }
 
   if (data && Array.isArray(data.matches)) {
+    saveCache(data.matches);
     processMatches(data.matches);
     const played = results.filter(r=>r&&r.gl!==null).length;
     const now = new Date().toLocaleTimeString('es-VE', {hour:'2-digit',minute:'2-digit'});
     setStatus('ok', `Resultados actualizados — ${played} partido${played===1?'':'s'} con marcador`);
     document.getElementById('last-update').textContent = `· Última consulta: ${now}`;
     hideError();
+  } else if (cache) {
+    // API falló pero hay caché viejo → mostrarlo con aviso
+    processMatches(cache.matches);
+    const played = results.filter(r=>r&&r.gl!==null).length;
+    setStatus('ok', `Mostrando últimos datos guardados (${fmtTime(cache.ts)}) — ${played} con marcador`);
+    document.getElementById('last-update').textContent = `· La API no respondió; reintenta en unos minutos`;
+    hideError();
   } else {
-    // Sin datos: todos los partidos quedan pendientes
+    // Sin datos ni caché
     for (let i = 0; i < 72; i++) results[i] = { gl:null, gv:null, status:'SCHEDULED' };
     setStatus('err', 'No se pudieron obtener los resultados');
     showError(lastError || 'Error desconocido');
@@ -819,7 +864,7 @@ function processMatches(apiMatches) {
       gl = m.score?.fullTime?.home ?? m.score?.regularTime?.home ?? null;
       gv = m.score?.fullTime?.away ?? m.score?.regularTime?.away ?? null;
     }
-    apiMap[key] = { gl, gv, status };
+    apiMap[key] = { gl, gv, status, utc: m.utcDate || null };
   }
 
   // Emparejar con los 72 partidos canónicos
@@ -829,7 +874,7 @@ function processMatches(apiMatches) {
     if (r) {
       results[i] = r;
     } else {
-      results[i] = { gl: null, gv: null, status: 'SCHEDULED' };
+      results[i] = { gl: null, gv: null, status: 'SCHEDULED', utc: null };
     }
   }
 }
@@ -946,14 +991,15 @@ function renderMatches() {
       chipHtml  = `<span class="status-chip chip-pend">Parcial</span>`;
     } else {
       scoreHtml = `<div class="match-score pending">vs</div>`;
-      chipHtml  = `<span class="status-chip chip-pend">${formatDate(p.fecha)}</span>`;
+      const hora = matchTime(r && r.utc);
+      chipHtml  = `<span class="status-chip chip-pend">${formatDate(p.fecha)}${hora ? ' · ' + hora : ''}</span>`;
     }
 
     return `
     <div class="match-card">
       <div class="match-header">
         <span class="match-group">Grupo ${p.g}</span>
-        <span class="match-date">${formatDate(p.fecha)}</span>
+        <span class="match-date">${formatDate(p.fecha)}${matchTime(r && r.utc) ? ' · ' + matchTime(r && r.utc) + ' (GMT-4)' : ''}</span>
       </div>
       <div class="match-teams">
         <span class="match-team">${p.loc}</span>
@@ -972,6 +1018,19 @@ function formatDate(d) {
   const [y,m,day] = d.split('-');
   const months = ['','ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
   return `${parseInt(day)} ${months[parseInt(m)]}`;
+}
+
+// Hora del partido en GMT-4 (Venezuela) desde el utcDate de la API
+function matchTime(utc) {
+  if (!utc) return '';
+  try {
+    const d = new Date(utc);
+    if (isNaN(d)) return '';
+    return d.toLocaleTimeString('es-VE', {
+      hour: 'numeric', minute: '2-digit', hour12: true,
+      timeZone: 'America/Caracas'
+    }).replace(/\s/g, ' ');
+  } catch(e) { return ''; }
 }
 
 function setStatus(type, msg) {
