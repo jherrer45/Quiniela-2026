@@ -711,63 +711,34 @@ const PARTIDOS = [
 //  MAPA de nombres: football-data.org → nombres en plantillas
 // ═══════════════════════════════════════════════
 const TEAM_MAP = {
-  "South Korea":          "Corea del Sur",
-  "Czech Republic":       "Rep. Checa",
-  "Czechia":              "Rep. Checa",
-  "Mexico":               "México",
-  "South Africa":         "Sudáfrica",
-  "Canada":               "Canadá",
-  "Bosnia and Herzegovina":"Bosnia-Herz.",
-  "Bosnia Herzegovina":   "Bosnia-Herz.",
-  "USA":                  "EE.UU.",
-  "United States":        "EE.UU.",
-  "Qatar":                "Qatar",
-  "Switzerland":          "Suiza",
-  "Brazil":               "Brasil",
-  "Morocco":              "Marruecos",
-  "Haiti":                "Haití",
-  "Scotland":             "Escocia",
-  "Australia":            "Australia",
-  "Turkey":               "Turquía",
-  "Türkiye":              "Turquía",
-  "Germany":              "Alemania",
-  "Curaçao":              "Curazao",
-  "Curacao":              "Curazao",
-  "Netherlands":          "Países Bajos",
-  "Japan":                "Japón",
-  "Ivory Coast":          "Costa de Marfil",
-  "Côte d'Ivoire":        "Costa de Marfil",
-  "Ecuador":              "Ecuador",
-  "Sweden":               "Suecia",
-  "Tunisia":              "Túnez",
-  "Belgium":              "Bélgica",
-  "Egypt":                "Egipto",
-  "Spain":                "España",
-  "Cabo Verde":           "Cabo Verde",
-  "Cape Verde":           "Cabo Verde",
-  "Iran":                 "Irán",
-  "New Zealand":          "Nueva Zelanda",
-  "Saudi Arabia":         "Arabia Saudita",
-  "Uruguay":              "Uruguay",
-  "France":               "Francia",
-  "Senegal":              "Senegal",
-  "Iraq":                 "Irak",
-  "Norway":               "Noruega",
-  "Argentina":            "Argentina",
-  "Algeria":              "Argelia",
-  "Portugal":             "Portugal",
-  "DR Congo":             "R.D. del Congo",
-  "Congo DR":             "R.D. del Congo",
-  "Democratic Republic of Congo": "R.D. del Congo",
-  "Uzbekistan":           "Uzbekistán",
-  "Colombia":             "Colombia",
-  "England":              "Inglaterra",
-  "Croatia":              "Croacia",
-  "Austria":              "Austria",
-  "Jordan":               "Jordania",
-  "Ghana":                "Ghana",
-  "Panama":               "Panamá",
-  "Kosovo":               "Kosovo",
+  // TheSportsDB usa nombres en inglés → grafía de las plantillas
+  "South Korea":"Corea del Sur", "Korea Republic":"Corea del Sur",
+  "Czech Republic":"Rep. Checa", "Czechia":"Rep. Checa",
+  "Mexico":"México", "South Africa":"Sudáfrica",
+  "Canada":"Canadá", "Bosnia-Herzegovina":"Bosnia-Herz.",
+  "Bosnia and Herzegovina":"Bosnia-Herz.", "Bosnia":"Bosnia-Herz.",
+  "USA":"EE.UU.", "United States":"EE.UU.", "Paraguay":"Paraguay",
+  "Qatar":"Qatar", "Switzerland":"Suiza",
+  "Brazil":"Brasil", "Morocco":"Marruecos",
+  "Haiti":"Haití", "Scotland":"Escocia",
+  "Australia":"Australia", "Turkey":"Turquía", "Türkiye":"Turquía",
+  "Germany":"Alemania", "Curacao":"Curazao", "Curaçao":"Curazao",
+  "Netherlands":"Países Bajos", "Japan":"Japón",
+  "Ivory Coast":"Costa de Marfil", "Cote d'Ivoire":"Costa de Marfil",
+  "Côte d'Ivoire":"Costa de Marfil",
+  "Ecuador":"Ecuador", "Sweden":"Suecia", "Tunisia":"Túnez",
+  "Belgium":"Bélgica", "Egypt":"Egipto",
+  "Spain":"España", "Cape Verde":"Cabo Verde", "Cabo Verde":"Cabo Verde",
+  "Iran":"Irán", "IR Iran":"Irán", "New Zealand":"Nueva Zelanda",
+  "Saudi Arabia":"Arabia Saudita", "Uruguay":"Uruguay",
+  "France":"Francia", "Senegal":"Senegal", "Iraq":"Irak",
+  "Norway":"Noruega", "Argentina":"Argentina", "Algeria":"Argelia",
+  "Portugal":"Portugal", "DR Congo":"R.D. del Congo",
+  "Congo DR":"R.D. del Congo", "Democratic Republic of Congo":"R.D. del Congo",
+  "Uzbekistan":"Uzbekistán", "Colombia":"Colombia",
+  "England":"Inglaterra", "Croatia":"Croacia",
+  "Austria":"Austria", "Jordan":"Jordania",
+  "Ghana":"Ghana", "Panama":"Panamá",
 };
 
 function mapTeam(name) {
@@ -803,63 +774,29 @@ function fmtTime(ts) {
   return new Date(ts).toLocaleTimeString('es-VE', {hour:'2-digit', minute:'2-digit', timeZone:'America/Caracas'});
 }
 
-// La API football-data.org NO permite CORS desde dominios web (solo localhost),
-// así que SIEMPRE hay que pasar por un proxy. Se prueban varios en orden.
-async function tryProxies() {
-  const API_PATH = `competitions/${WC_ID}/matches`;
-  const apiBase  = `https://api.football-data.org/v4/${API_PATH}`;
+// TheSportsDB: API pública gratuita (key 123), responde rápido y permite CORS.
+// Endpoint de temporada → trae los 72 partidos con marcador y estado.
+const SDB_KEY = '123';
+const SDB_LEAGUE = '4429';   // FIFA World Cup
+const SDB_SEASON = '2026';
 
-  const attempts = [
-    // allorigins: la key va en query param, fetch server-side, devuelve {contents}
-    async () => {
-      const u = `https://api.allorigins.win/get?url=${encodeURIComponent(apiBase + '?X-Auth-Token=' + API_KEY)}`;
-      const r = await fetch(u);
-      const w = await r.json();
-      const j = JSON.parse(w.contents);
-      if (Array.isArray(j.matches)) return j;
-      throw new Error(j.message || 'sin matches');
-    },
-    // allorigins/raw: igual pero respuesta directa
-    async () => {
-      const u = `https://api.allorigins.win/raw?url=${encodeURIComponent(apiBase + '?X-Auth-Token=' + API_KEY)}`;
-      const r = await fetch(u);
-      const j = await r.json();
-      if (Array.isArray(j.matches)) return j;
-      throw new Error(j.message || 'sin matches');
-    },
-    // codetabs: proxy simple, key en query
-    async () => {
-      const u = `https://api.codetabs.com/v1/proxy/?quest=${apiBase}?X-Auth-Token=${API_KEY}`;
-      const r = await fetch(u);
-      const j = await r.json();
-      if (Array.isArray(j.matches)) return j;
-      throw new Error(j.message || 'sin matches');
-    },
-    // corsproxy.io con header
-    async () => {
-      const u = `https://corsproxy.io/?url=${encodeURIComponent(apiBase)}`;
-      const r = await fetch(u, { headers: { 'X-Auth-Token': API_KEY } });
-      const j = await r.json();
-      if (Array.isArray(j.matches)) return j;
-      throw new Error(j.message || 'sin matches');
-    },
-  ];
-
-  let lastError = '';
-  for (const attempt of attempts) {
-    try {
-      const data = await attempt();
-      if (data && Array.isArray(data.matches)) return { data, error: '' };
-    } catch(e) { lastError = e.message; }
+async function fetchSportsDB() {
+  const url = `https://www.thesportsdb.com/api/v1/json/${SDB_KEY}/eventsseason.php?id=${SDB_LEAGUE}&s=${SDB_SEASON}`;
+  try {
+    const r = await fetch(url);
+    const j = await r.json();
+    if (j && Array.isArray(j.events)) return { events: j.events, error: '' };
+    return { events: null, error: 'Respuesta sin eventos' };
+  } catch(e) {
+    return { events: null, error: e.message };
   }
-  return { data: null, error: lastError };
 }
 
 async function fetchResults() {
   setStatus('loading', 'Consultando resultados del Mundial…');
   const cache = loadCache();
 
-  // 1) Si el caché es muy fresco (< TTL), úsalo de inmediato y NO llames a la API
+  // 1) Caché muy fresco → usar sin llamar
   if (cache && (Date.now() - cache.ts) < CACHE_TTL_MIN * 60 * 1000) {
     processMatches(cache.matches);
     const played = results.filter(r=>r&&r.gl!==null).length;
@@ -871,26 +808,24 @@ async function fetchResults() {
     return;
   }
 
-  // 2) Intentar traer datos frescos vía proxies
-  const { data, error } = await tryProxies();
+  // 2) Traer de TheSportsDB
+  const { events, error } = await fetchSportsDB();
 
-  if (data && Array.isArray(data.matches)) {
-    saveCache(data.matches);
-    processMatches(data.matches);
+  if (events && events.length) {
+    saveCache(events);
+    processMatches(events);
     const played = results.filter(r=>r&&r.gl!==null).length;
     const now = new Date().toLocaleTimeString('es-VE', {hour:'2-digit',minute:'2-digit',timeZone:'America/Caracas'});
     setStatus('ok', `Resultados actualizados — ${played} partido${played===1?'':'s'} con marcador`);
     document.getElementById('last-update').textContent = `· Última consulta: ${now}`;
     hideError();
   } else if (cache) {
-    // 3) Falló la API pero hay caché (aunque viejo): mostrarlo con aviso
     processMatches(cache.matches);
     const played = results.filter(r=>r&&r.gl!==null).length;
     setStatus('ok', `Mostrando últimos datos (${fmtTime(cache.ts)}) — ${played} con marcador`);
     document.getElementById('last-update').textContent = `· La fuente no respondió; reintenta en unos minutos`;
     hideError();
   } else {
-    // 4) Nada
     for (let i = 0; i < 72; i++) results[i] = { gl:null, gv:null, status:'SCHEDULED', utc:null };
     setStatus('err', 'No se pudieron obtener los resultados');
     showError(error || 'Error desconocido');
@@ -899,26 +834,38 @@ async function fetchResults() {
   document.getElementById('loading').classList.add('hidden');
 }
 
-function processMatches(apiMatches) {
-  // Construir un mapa rápido: "EQUIPO_LOCAL|EQUIPO_VISITANTE" → resultado
+function processMatches(events) {
+  // events = array de TheSportsDB
+  // Construir mapa "LOCAL|VISITANTE" → resultado
   const apiMap = {};
-  for (const m of apiMatches) {
-    const loc = mapTeam(m.homeTeam.name || m.homeTeam.shortName || '');
-    const vis = mapTeam(m.awayTeam.name || m.awayTeam.shortName || '');
+  for (const e of events) {
+    const loc = mapTeam((e.strHomeTeam || '').trim());
+    const vis = mapTeam((e.strAwayTeam || '').trim());
     const key = `${loc}|${vis}`;
-    const status = m.status; // SCHEDULED, TIMED, IN_PLAY, PAUSED, FINISHED, POSTPONED
-    let gl = null, gv = null;
-    if (status === 'FINISHED' || status === 'IN_PLAY' || status === 'PAUSED') {
-      gl = m.score?.fullTime?.home ?? m.score?.regularTime?.home ?? null;
-      gv = m.score?.fullTime?.away ?? m.score?.regularTime?.away ?? null;
+    // Estado: FT/AET/PEN = terminado; "1H"/"2H"/"LIVE"/"HT" = en vivo; NS = no empezado
+    const st = (e.strStatus || '').toUpperCase();
+    let status = 'SCHEDULED', gl = null, gv = null;
+    const hasScore = e.intHomeScore !== null && e.intHomeScore !== undefined && e.intHomeScore !== '';
+    if (['FT','AET','PEN','MATCH FINISHED'].includes(st)) {
+      status = 'FINISHED';
+      if (hasScore) { gl = parseInt(e.intHomeScore); gv = parseInt(e.intAwayScore); }
+    } else if (['1H','2H','HT','LIVE','ET','P','BT'].includes(st)) {
+      status = 'IN_PLAY';
+      if (hasScore) { gl = parseInt(e.intHomeScore); gv = parseInt(e.intAwayScore); }
+    } else {
+      // NS u otro: pendiente, pero si trae score lo tomamos igual
+      if (hasScore) { gl = parseInt(e.intHomeScore); gv = parseInt(e.intAwayScore); if(gl!==null) status='FINISHED'; }
     }
-    apiMap[key] = { gl, gv, status, utc: m.utcDate || null };
+    // utc desde strTimestamp
+    let utc = null;
+    if (e.strTimestamp) utc = e.strTimestamp.includes('Z') ? e.strTimestamp : e.strTimestamp + 'Z';
+    apiMap[key] = { gl, gv, status, utc };
   }
 
   // Emparejar con los 72 partidos canónicos
   for (let i = 0; i < PARTIDOS.length; i++) {
-    const p  = PARTIDOS[i];
-    const r  = apiMap[`${p.loc}|${p.vis}`];
+    const p = PARTIDOS[i];
+    const r = apiMap[`${p.loc}|${p.vis}`];
     if (r) {
       results[i] = r;
     } else {
