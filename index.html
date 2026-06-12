@@ -785,7 +785,7 @@ let activeTab = 'ranking';
 //  FETCH RESULTADOS
 // ═══════════════════════════════════════════════
 const CACHE_KEY = 'quiniela2026_results';
-const CACHE_TTL_MIN = 10;   // minutos de validez del caché
+const CACHE_TTL_MIN = 3;   // caché corto: refresca seguido pero protege ante caídas
 
 function loadCache() {
   try {
@@ -796,23 +796,70 @@ function loadCache() {
     return c;
   } catch(e) { return null; }
 }
-
 function saveCache(matches) {
-  try {
-    localStorage.setItem(CACHE_KEY, JSON.stringify({ matches, ts: Date.now() }));
-  } catch(e) {}
+  try { localStorage.setItem(CACHE_KEY, JSON.stringify({ matches, ts: Date.now() })); } catch(e) {}
+}
+function fmtTime(ts) {
+  return new Date(ts).toLocaleTimeString('es-VE', {hour:'2-digit', minute:'2-digit', timeZone:'America/Caracas'});
 }
 
-function fmtTime(ts) {
-  return new Date(ts).toLocaleTimeString('es-VE', {hour:'2-digit', minute:'2-digit'});
+// La API football-data.org NO permite CORS desde dominios web (solo localhost),
+// así que SIEMPRE hay que pasar por un proxy. Se prueban varios en orden.
+async function tryProxies() {
+  const API_PATH = `competitions/${WC_ID}/matches`;
+  const apiBase  = `https://api.football-data.org/v4/${API_PATH}`;
+
+  const attempts = [
+    // allorigins: la key va en query param, fetch server-side, devuelve {contents}
+    async () => {
+      const u = `https://api.allorigins.win/get?url=${encodeURIComponent(apiBase + '?X-Auth-Token=' + API_KEY)}`;
+      const r = await fetch(u);
+      const w = await r.json();
+      const j = JSON.parse(w.contents);
+      if (Array.isArray(j.matches)) return j;
+      throw new Error(j.message || 'sin matches');
+    },
+    // allorigins/raw: igual pero respuesta directa
+    async () => {
+      const u = `https://api.allorigins.win/raw?url=${encodeURIComponent(apiBase + '?X-Auth-Token=' + API_KEY)}`;
+      const r = await fetch(u);
+      const j = await r.json();
+      if (Array.isArray(j.matches)) return j;
+      throw new Error(j.message || 'sin matches');
+    },
+    // codetabs: proxy simple, key en query
+    async () => {
+      const u = `https://api.codetabs.com/v1/proxy/?quest=${apiBase}?X-Auth-Token=${API_KEY}`;
+      const r = await fetch(u);
+      const j = await r.json();
+      if (Array.isArray(j.matches)) return j;
+      throw new Error(j.message || 'sin matches');
+    },
+    // corsproxy.io con header
+    async () => {
+      const u = `https://corsproxy.io/?url=${encodeURIComponent(apiBase)}`;
+      const r = await fetch(u, { headers: { 'X-Auth-Token': API_KEY } });
+      const j = await r.json();
+      if (Array.isArray(j.matches)) return j;
+      throw new Error(j.message || 'sin matches');
+    },
+  ];
+
+  let lastError = '';
+  for (const attempt of attempts) {
+    try {
+      const data = await attempt();
+      if (data && Array.isArray(data.matches)) return { data, error: '' };
+    } catch(e) { lastError = e.message; }
+  }
+  return { data: null, error: lastError };
 }
 
 async function fetchResults() {
   setStatus('loading', 'Consultando resultados del Mundial…');
-  const apiUrl = `https://api.football-data.org/v4/competitions/${WC_ID}/matches`;
   const cache = loadCache();
 
-  // Caché fresco (< CACHE_TTL_MIN minutos) → usar sin llamar a la API
+  // 1) Si el caché es muy fresco (< TTL), úsalo de inmediato y NO llames a la API
   if (cache && (Date.now() - cache.ts) < CACHE_TTL_MIN * 60 * 1000) {
     processMatches(cache.matches);
     const played = results.filter(r=>r&&r.gl!==null).length;
@@ -824,49 +871,29 @@ async function fetchResults() {
     return;
   }
 
-  let data = null;
-  let lastError = '';
-
-  // Método 1: fetch directo con header (football-data v4 soporta CORS)
-  try {
-    const r = await fetch(apiUrl, { headers: { 'X-Auth-Token': API_KEY } });
-    const j = await r.json();
-    if (j && Array.isArray(j.matches)) data = j;
-    else lastError = j.message || `HTTP ${r.status}`;
-  } catch(e) { lastError = e.message; }
-
-  // Método 2: corsproxy.io con header
-  if (!data) {
-    try {
-      const r = await fetch(`https://corsproxy.io/?url=${encodeURIComponent(apiUrl)}`, {
-        headers: { 'X-Auth-Token': API_KEY }
-      });
-      const j = await r.json();
-      if (j && Array.isArray(j.matches)) data = j;
-      else lastError = j.message || `HTTP ${r.status}`;
-    } catch(e) { lastError = e.message; }
-  }
+  // 2) Intentar traer datos frescos vía proxies
+  const { data, error } = await tryProxies();
 
   if (data && Array.isArray(data.matches)) {
     saveCache(data.matches);
     processMatches(data.matches);
     const played = results.filter(r=>r&&r.gl!==null).length;
-    const now = new Date().toLocaleTimeString('es-VE', {hour:'2-digit',minute:'2-digit'});
+    const now = new Date().toLocaleTimeString('es-VE', {hour:'2-digit',minute:'2-digit',timeZone:'America/Caracas'});
     setStatus('ok', `Resultados actualizados — ${played} partido${played===1?'':'s'} con marcador`);
     document.getElementById('last-update').textContent = `· Última consulta: ${now}`;
     hideError();
   } else if (cache) {
-    // API falló pero hay caché viejo → mostrarlo con aviso
+    // 3) Falló la API pero hay caché (aunque viejo): mostrarlo con aviso
     processMatches(cache.matches);
     const played = results.filter(r=>r&&r.gl!==null).length;
-    setStatus('ok', `Mostrando últimos datos guardados (${fmtTime(cache.ts)}) — ${played} con marcador`);
-    document.getElementById('last-update').textContent = `· La API no respondió; reintenta en unos minutos`;
+    setStatus('ok', `Mostrando últimos datos (${fmtTime(cache.ts)}) — ${played} con marcador`);
+    document.getElementById('last-update').textContent = `· La fuente no respondió; reintenta en unos minutos`;
     hideError();
   } else {
-    // Sin datos ni caché
-    for (let i = 0; i < 72; i++) results[i] = { gl:null, gv:null, status:'SCHEDULED' };
+    // 4) Nada
+    for (let i = 0; i < 72; i++) results[i] = { gl:null, gv:null, status:'SCHEDULED', utc:null };
     setStatus('err', 'No se pudieron obtener los resultados');
-    showError(lastError || 'Error desconocido');
+    showError(error || 'Error desconocido');
   }
   render();
   document.getElementById('loading').classList.add('hidden');
