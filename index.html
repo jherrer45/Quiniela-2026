@@ -482,10 +482,25 @@
 
   /* ── Footer ── */
   footer {
-    text-align:center; padding:24px 16px;
+    text-align:center; padding:28px 16px 24px;
     font-size:11px; color:var(--muted);
     border-top:1px solid var(--border);
   }
+  .footer-credit {
+    margin-bottom: 10px;
+  }
+  .credit-line {
+    display: block;
+    font-size: 9px; text-transform: uppercase;
+    letter-spacing: .18em; color: var(--muted);
+    margin-bottom: 3px;
+  }
+  .credit-name {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 1.15rem; letter-spacing: .08em;
+    color: var(--gold);
+  }
+  .footer-meta { color: var(--muted); }
 </style>
 </head>
 <body>
@@ -593,7 +608,13 @@
 </main>
 
 <footer>
-  Resultados vía <strong>football-data.org</strong> · Se actualiza automáticamente al abrir la página
+  <div class="footer-credit">
+    <span class="credit-line">Diseñado y desarrollado por</span>
+    <span class="credit-name">Javier Herrera</span>
+  </div>
+  <div class="footer-meta">
+    Resultados vía <strong>football-data.org</strong> · Se actualiza automáticamente al abrir la página
+  </div>
 </footer>
 
 <script>
