@@ -781,34 +781,56 @@ const SDB_LEAGUE = '4429';   // FIFA World Cup
 const SDB_SEASON = '2026';
 
 async function fetchSportsDB() {
-  const url = `https://www.thesportsdb.com/api/v1/json/${SDB_KEY}/eventsseason.php?id=${SDB_LEAGUE}&s=${SDB_SEASON}`;
-  try {
-    const r = await fetch(url);
-    const j = await r.json();
-    if (j && Array.isArray(j.events)) return { events: j.events, error: '' };
-    return { events: null, error: 'Respuesta sin eventos' };
-  } catch(e) {
-    return { events: null, error: e.message };
+  const base = `https://www.thesportsdb.com/api/v1/json/${SDB_KEY}`;
+  const bust = `&_=${Date.now()}`;   // evita que el navegador cachee la respuesta
+  const urls = [
+    `${base}/eventsseason.php?id=${SDB_LEAGUE}&s=${SDB_SEASON}${bust}`,
+    `${base}/eventspastleague.php?id=${SDB_LEAGUE}?${bust}`,
+  ];
+
+  let merged = {};   // clave "Home|Away" → evento más reciente con score
+  let gotAny = false;
+  let lastError = '';
+
+  for (const url of urls) {
+    try {
+      const r = await fetch(url, { cache: 'no-store' });
+      const j = await r.json();
+      const ev = j.events || j.event || [];
+      if (Array.isArray(ev) && ev.length) {
+        gotAny = true;
+        for (const e of ev) {
+          const k = `${(e.strHomeTeam||'').trim()}|${(e.strAwayTeam||'').trim()}`;
+          const hasScore = e.intHomeScore !== null && e.intHomeScore !== undefined && e.intHomeScore !== '';
+          // Preferir la versión CON score sobre la sin score
+          if (!merged[k] || (hasScore && !merged[k]._score)) {
+            merged[k] = { ...e, _score: hasScore };
+          }
+        }
+      }
+    } catch(e) { lastError = e.message; }
   }
+
+  if (gotAny) return { events: Object.values(merged), error: '' };
+  return { events: null, error: lastError || 'Sin datos' };
 }
 
 async function fetchResults() {
   setStatus('loading', 'Consultando resultados del Mundial…');
   const cache = loadCache();
 
-  // 1) Caché muy fresco → usar sin llamar
-  if (cache && (Date.now() - cache.ts) < CACHE_TTL_MIN * 60 * 1000) {
+  // 1) Si hay caché, muéstralo de inmediato (carga instantánea)
+  if (cache && Array.isArray(cache.matches) && cache.matches.length) {
     processMatches(cache.matches);
     const played = results.filter(r=>r&&r.gl!==null).length;
-    setStatus('ok', `Resultados actualizados — ${played} partido${played===1?'':'s'} con marcador`);
-    document.getElementById('last-update').textContent = `· Datos de las ${fmtTime(cache.ts)}`;
+    setStatus('ok', `Resultados de las ${fmtTime(cache.ts)} — actualizando…`);
+    document.getElementById('last-update').textContent = `· Buscando datos nuevos…`;
     hideError();
     render();
     document.getElementById('loading').classList.add('hidden');
-    return;
   }
 
-  // 2) Traer de TheSportsDB
+  // 2) SIEMPRE consultar la API en busca de datos frescos (aunque haya caché)
   const { events, error } = await fetchSportsDB();
 
   if (events && events.length) {
@@ -819,8 +841,8 @@ async function fetchResults() {
     setStatus('ok', `Resultados actualizados — ${played} partido${played===1?'':'s'} con marcador`);
     document.getElementById('last-update').textContent = `· Última consulta: ${now}`;
     hideError();
-  } else if (cache) {
-    processMatches(cache.matches);
+  } else if (cache && Array.isArray(cache.matches) && cache.matches.length) {
+    // API falló pero ya mostramos el caché arriba → solo ajustar el aviso
     const played = results.filter(r=>r&&r.gl!==null).length;
     setStatus('ok', `Mostrando últimos datos (${fmtTime(cache.ts)}) — ${played} con marcador`);
     document.getElementById('last-update').textContent = `· La fuente no respondió; reintenta en unos minutos`;
