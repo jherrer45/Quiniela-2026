@@ -768,7 +768,33 @@ function loadCache() {
   } catch(e) { return null; }
 }
 function saveCache(matches) {
-  try { localStorage.setItem(CACHE_KEY, JSON.stringify({ matches, ts: Date.now() })); } catch(e) {}
+  try {
+    // Caché ACUMULATIVO: fusiona lo nuevo con lo ya guardado.
+    // Lo que apareció una vez con marcador queda fijado para siempre.
+    let prev = [];
+    try {
+      const raw = localStorage.getItem(CACHE_KEY);
+      if (raw) { const c = JSON.parse(raw); if (Array.isArray(c.matches)) prev = c.matches; }
+    } catch(e) {}
+
+    const byKey = {};
+    const keyOf = e => `${(e.strHomeTeam||'').trim()}|${(e.strAwayTeam||'').trim()}`;
+    const hasScore = e => e.intHomeScore !== null && e.intHomeScore !== undefined && e.intHomeScore !== '';
+
+    // Primero lo previo (lo ya guardado)
+    for (const e of prev) { if (e && e.strHomeTeam) byKey[keyOf(e)] = e; }
+    // Luego lo nuevo: solo sobrescribe si trae marcador o si no existía
+    for (const e of matches) {
+      if (!e || !e.strHomeTeam) continue;
+      const k = keyOf(e);
+      const old = byKey[k];
+      // No pisar un partido CON marcador con uno SIN marcador
+      if (old && hasScore(old) && !hasScore(e)) continue;
+      byKey[k] = e;
+    }
+
+    localStorage.setItem(CACHE_KEY, JSON.stringify({ matches: Object.values(byKey), ts: Date.now() }));
+  } catch(e) {}
 }
 function fmtTime(ts) {
   return new Date(ts).toLocaleTimeString('es-VE', {hour:'2-digit', minute:'2-digit', timeZone:'America/Caracas'});
@@ -783,15 +809,16 @@ const SDB_SEASON = '2026';
 async function fetchSportsDB() {
   const base = `https://www.thesportsdb.com/api/v1/json/${SDB_KEY}`;
   const bust = Date.now();
-  // IMPORTANTE: eventsseason (plan free) SOLO trae los primeros 15 partidos.
-  // eventspastleague trae los MÁS RECIENTES. Hay que combinar ambos.
+  // eventsround r=1 = fase de grupos COMPLETA (los 72 partidos). Es el endpoint
+  // más completo del plan free. Los otros van como respaldo por si falla.
   const urls = [
+    `${base}/eventsround.php?id=${SDB_LEAGUE}&r=1&s=${SDB_SEASON}&_=${bust}`,
     `${base}/eventsseason.php?id=${SDB_LEAGUE}&s=${SDB_SEASON}&_=${bust}`,
     `${base}/eventspastleague.php?id=${SDB_LEAGUE}&_=${bust}`,
     `${base}/eventsnextleague.php?id=${SDB_LEAGUE}&_=${bust}`,
   ];
 
-  let merged = {};   // "Home|Away" → mejor versión del evento
+  let merged = {};
   let gotAny = false;
   let lastError = '';
 
@@ -799,7 +826,6 @@ async function fetchSportsDB() {
     try {
       const r = await fetch(url, { cache: 'no-store' });
       const j = await r.json();
-      // events puede venir como array, o como string de error ("Invalid League ID")
       const ev = Array.isArray(j.events) ? j.events : [];
       if (ev.length) {
         gotAny = true;
@@ -807,7 +833,6 @@ async function fetchSportsDB() {
           if (!e || !e.strHomeTeam) continue;
           const k = `${(e.strHomeTeam||'').trim()}|${(e.strAwayTeam||'').trim()}`;
           const hasScore = e.intHomeScore !== null && e.intHomeScore !== undefined && e.intHomeScore !== '';
-          // Preferir versión CON marcador sobre la versión sin marcador
           if (!merged[k] || (hasScore && !merged[k]._score)) {
             merged[k] = { ...e, _score: hasScore };
           }
