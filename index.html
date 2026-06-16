@@ -782,13 +782,16 @@ const SDB_SEASON = '2026';
 
 async function fetchSportsDB() {
   const base = `https://www.thesportsdb.com/api/v1/json/${SDB_KEY}`;
-  const bust = `&_=${Date.now()}`;   // evita que el navegador cachee la respuesta
+  const bust = Date.now();
+  // IMPORTANTE: eventsseason (plan free) SOLO trae los primeros 15 partidos.
+  // eventspastleague trae los MÁS RECIENTES. Hay que combinar ambos.
   const urls = [
-    `${base}/eventsseason.php?id=${SDB_LEAGUE}&s=${SDB_SEASON}${bust}`,
-    `${base}/eventspastleague.php?id=${SDB_LEAGUE}?${bust}`,
+    `${base}/eventsseason.php?id=${SDB_LEAGUE}&s=${SDB_SEASON}&_=${bust}`,
+    `${base}/eventspastleague.php?id=${SDB_LEAGUE}&_=${bust}`,
+    `${base}/eventsnextleague.php?id=${SDB_LEAGUE}&_=${bust}`,
   ];
 
-  let merged = {};   // clave "Home|Away" → evento más reciente con score
+  let merged = {};   // "Home|Away" → mejor versión del evento
   let gotAny = false;
   let lastError = '';
 
@@ -796,19 +799,21 @@ async function fetchSportsDB() {
     try {
       const r = await fetch(url, { cache: 'no-store' });
       const j = await r.json();
-      const ev = j.events || j.event || [];
-      if (Array.isArray(ev) && ev.length) {
+      // events puede venir como array, o como string de error ("Invalid League ID")
+      const ev = Array.isArray(j.events) ? j.events : [];
+      if (ev.length) {
         gotAny = true;
         for (const e of ev) {
+          if (!e || !e.strHomeTeam) continue;
           const k = `${(e.strHomeTeam||'').trim()}|${(e.strAwayTeam||'').trim()}`;
           const hasScore = e.intHomeScore !== null && e.intHomeScore !== undefined && e.intHomeScore !== '';
-          // Preferir la versión CON score sobre la sin score
+          // Preferir versión CON marcador sobre la versión sin marcador
           if (!merged[k] || (hasScore && !merged[k]._score)) {
             merged[k] = { ...e, _score: hasScore };
           }
         }
       }
-    } catch(e) { lastError = e.message; }
+    } catch(err) { lastError = err.message; }
   }
 
   if (gotAny) return { events: Object.values(merged), error: '' };
