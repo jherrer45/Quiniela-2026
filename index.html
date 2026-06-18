@@ -913,39 +913,39 @@ async function fetchResults() {
 }
 
 function processMatches(events) {
-  // events = array de TheSportsDB
-  // Construir mapa "LOCAL|VISITANTE" → resultado
+  // Construir mapa por AMBOS sentidos: "LOCAL|VISITANTE" y "VISITANTE|LOCAL"
+  // Algunos partidos vienen con local/visitante invertidos respecto a la plantilla.
   const apiMap = {};
   for (const e of events) {
-    const loc = mapTeam((e.strHomeTeam || '').trim());
-    const vis = mapTeam((e.strAwayTeam || '').trim());
-    const key = `${loc}|${vis}`;
-    // Estado: FT/AET/PEN = terminado; "1H"/"2H"/"LIVE"/"HT" = en vivo; NS = no empezado
+    const a = mapTeam((e.strHomeTeam || '').trim());
+    const b = mapTeam((e.strAwayTeam || '').trim());
     const st = (e.strStatus || '').toUpperCase();
-    let status = 'SCHEDULED', gl = null, gv = null;
+    let status = 'SCHEDULED', gh = null, ga = null;
     const hasScore = e.intHomeScore !== null && e.intHomeScore !== undefined && e.intHomeScore !== '';
     if (['FT','AET','PEN','MATCH FINISHED'].includes(st)) {
       status = 'FINISHED';
-      if (hasScore) { gl = parseInt(e.intHomeScore); gv = parseInt(e.intAwayScore); }
+      if (hasScore) { gh = parseInt(e.intHomeScore); ga = parseInt(e.intAwayScore); }
     } else if (['1H','2H','HT','LIVE','ET','P','BT'].includes(st)) {
       status = 'IN_PLAY';
-      if (hasScore) { gl = parseInt(e.intHomeScore); gv = parseInt(e.intAwayScore); }
+      if (hasScore) { gh = parseInt(e.intHomeScore); ga = parseInt(e.intAwayScore); }
     } else {
-      // NS u otro: pendiente, pero si trae score lo tomamos igual
-      if (hasScore) { gl = parseInt(e.intHomeScore); gv = parseInt(e.intAwayScore); if(gl!==null) status='FINISHED'; }
+      if (hasScore) { gh = parseInt(e.intHomeScore); ga = parseInt(e.intAwayScore); if (gh !== null) status = 'FINISHED'; }
     }
-    // utc desde strTimestamp
     let utc = null;
     if (e.strTimestamp) utc = e.strTimestamp.includes('Z') ? e.strTimestamp : e.strTimestamp + 'Z';
-    apiMap[key] = { gl, gv, status, utc };
+
+    // Guardar en sentido normal (a vs b)
+    apiMap[`${a}|${b}`] = { gl: gh, gv: ga, status, utc, flip: false };
+    // Y en sentido invertido (b vs a) con marcador volteado
+    apiMap[`${b}|${a}`] = { gl: ga, gv: gh, status, utc, flip: true };
   }
 
-  // Emparejar con los 72 partidos canónicos
+  // Emparejar con los 72 partidos canónicos, en el orden de la plantilla
   for (let i = 0; i < PARTIDOS.length; i++) {
     const p = PARTIDOS[i];
     const r = apiMap[`${p.loc}|${p.vis}`];
     if (r) {
-      results[i] = r;
+      results[i] = { gl: r.gl, gv: r.gv, status: r.status, utc: r.utc };
     } else {
       results[i] = { gl: null, gv: null, status: 'SCHEDULED', utc: null };
     }
