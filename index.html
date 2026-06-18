@@ -806,39 +806,65 @@ const SDB_KEY = '123';
 const SDB_LEAGUE = '4429';   // FIFA World Cup
 const SDB_SEASON = '2026';
 
+// Fechas de la fase de grupos del Mundial 2026 (11 jun – 27 jun)
+const SDB_DAYS = [
+  '2026-06-11','2026-06-12','2026-06-13','2026-06-14','2026-06-15',
+  '2026-06-16','2026-06-17','2026-06-18','2026-06-19','2026-06-20',
+  '2026-06-21','2026-06-22','2026-06-23','2026-06-24','2026-06-25',
+  '2026-06-26','2026-06-27'
+];
+
 async function fetchSportsDB() {
   const base = `https://www.thesportsdb.com/api/v1/json/${SDB_KEY}`;
   const bust = Date.now();
-  // eventsround r=1 = fase de grupos COMPLETA (los 72 partidos). Es el endpoint
-  // más completo del plan free. Los otros van como respaldo por si falla.
-  const urls = [
+  let merged = {};
+  let gotAny = false;
+  let lastError = '';
+
+  const keyOf = e => `${(e.strHomeTeam||'').trim()}|${(e.strAwayTeam||'').trim()}`;
+  const hasScore = e => e.intHomeScore !== null && e.intHomeScore !== undefined && e.intHomeScore !== '';
+
+  function absorb(ev) {
+    for (const e of ev) {
+      if (!e || !e.strHomeTeam) continue;
+      // Si el evento declara liga y NO es el Mundial (4429), ignorarlo
+      if (e.idLeague && String(e.idLeague) !== String(SDB_LEAGUE)) continue;
+      const k = keyOf(e);
+      if (!merged[k] || (hasScore(e) && !merged[k]._score)) {
+        merged[k] = { ...e, _score: hasScore(e) };
+      }
+    }
+  }
+
+  // 1) Endpoints "globales" rápidos (1 sola llamada cada uno) como base
+  const globalUrls = [
     `${base}/eventsround.php?id=${SDB_LEAGUE}&r=1&s=${SDB_SEASON}&_=${bust}`,
     `${base}/eventsseason.php?id=${SDB_LEAGUE}&s=${SDB_SEASON}&_=${bust}`,
     `${base}/eventspastleague.php?id=${SDB_LEAGUE}&_=${bust}`,
     `${base}/eventsnextleague.php?id=${SDB_LEAGUE}&_=${bust}`,
   ];
-
-  let merged = {};
-  let gotAny = false;
-  let lastError = '';
-
-  for (const url of urls) {
+  for (const url of globalUrls) {
     try {
       const r = await fetch(url, { cache: 'no-store' });
       const j = await r.json();
       const ev = Array.isArray(j.events) ? j.events : [];
-      if (ev.length) {
-        gotAny = true;
-        for (const e of ev) {
-          if (!e || !e.strHomeTeam) continue;
-          const k = `${(e.strHomeTeam||'').trim()}|${(e.strAwayTeam||'').trim()}`;
-          const hasScore = e.intHomeScore !== null && e.intHomeScore !== undefined && e.intHomeScore !== '';
-          if (!merged[k] || (hasScore && !merged[k]._score)) {
-            merged[k] = { ...e, _score: hasScore };
-          }
-        }
-      }
+      if (ev.length) { gotAny = true; absorb(ev); }
     } catch(err) { lastError = err.message; }
+  }
+
+  // 2) Día por día (eventsday) — trae los partidos completos de cada fecha.
+  //    Se filtran solo los del Mundial (idLeague 4429) para no mezclar otras ligas.
+  const dayResults = await Promise.allSettled(
+    SDB_DAYS.map(d =>
+      fetch(`${base}/eventsday.php?d=${d}&l=${SDB_LEAGUE}&_=${bust}`, { cache: 'no-store' })
+        .then(r => r.json())
+    )
+  );
+  for (const res of dayResults) {
+    if (res.status === 'fulfilled') {
+      const ev = Array.isArray(res.value.events) ? res.value.events : [];
+      if (ev.length) { gotAny = true; absorb(ev); }
+    }
   }
 
   if (gotAny) return { events: Object.values(merged), error: '' };
