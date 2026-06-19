@@ -241,6 +241,12 @@
     margin-top:6px; text-align:center;
     font-size:10px; color:var(--muted);
   }
+  .match-score.waiting { color: var(--gold); font-size: 1.4rem; }
+  .chip-wait {
+    background: rgba(240,180,41,.15); color: var(--gold);
+    border: 1px solid rgba(240,180,41,.3);
+    font-size: 9px !important; padding: 3px 7px;
+  }
   .status-chip {
     display:inline-block; padding:2px 7px; border-radius:99px;
     font-weight:600; font-size:10px;
@@ -710,8 +716,83 @@ const PARTIDOS = [
 // ═══════════════════════════════════════════════
 //  MAPA de nombres: football-data.org → nombres en plantillas
 // ═══════════════════════════════════════════════
+const KICKOFFS = {
+  "Corea del Sur|Rep. Checa":"2026-06-12T02:00Z",
+  "México|Sudáfrica":"2026-06-11T19:00Z",
+  "Canadá|Bosnia-Herz.":"2026-06-12T19:00Z",
+  "EE.UU.|Paraguay":"2026-06-13T01:00Z",
+  "Qatar|Suiza":"2026-06-13T19:00Z",
+  "Brasil|Marruecos":"2026-06-14T01:00Z",
+  "Haití|Escocia":"2026-06-13T22:00Z",
+  "Australia|Turquía":"2026-06-14T18:00Z",
+  "Alemania|Curazao":"2026-06-14T22:00Z",
+  "Países Bajos|Japón":"2026-06-15T01:00Z",
+  "Costa de Marfil|Ecuador":"2026-06-14T19:00Z",
+  "Suecia|Túnez":"2026-06-15T18:00Z",
+  "Bélgica|Egipto":"2026-06-15T22:00Z",
+  "España|Cabo Verde":"2026-06-16T01:00Z",
+  "Irán|Nueva Zelanda":"2026-06-16T01:00Z",
+  "Arabia Saudita|Uruguay":"2026-06-15T19:00Z",
+  "Francia|Senegal":"2026-06-16T19:00Z",
+  "Irak|Noruega":"2026-06-16T22:00Z",
+  "Argentina|Argelia":"2026-06-17T01:00Z",
+  "Portugal|R.D. del Congo":"2026-06-17T22:00Z",
+  "Uzbekistán|Colombia":"2026-06-18T02:00Z",
+  "Inglaterra|Croacia":"2026-06-17T20:00Z",
+  "Austria|Jordania":"2026-06-17T19:00Z",
+  "México|Corea del Sur":"2026-06-19T01:00Z",
+  "Ghana|Panamá":"2026-06-18T01:00Z",
+  "Sudáfrica|Rep. Checa":"2026-06-18T19:00Z",
+  "Canadá|Qatar":"2026-06-18T23:00Z",
+  "Bosnia-Herz.|Suiza":"2026-06-19T00:00Z",
+  "Brasil|Haití":"2026-06-20T01:00Z",
+  "Marruecos|Escocia":"2026-06-19T22:00Z",
+  "EE.UU.|Australia":"2026-06-19T22:00Z",
+  "Paraguay|Turquía":"2026-06-20T01:00Z",
+  "Alemania|Costa de Marfil":"2026-06-21T01:00Z",
+  "Curazao|Ecuador":"2026-06-20T19:00Z",
+  "Países Bajos|Suecia":"2026-06-20T22:00Z",
+  "Japón|Túnez":"2026-06-21T19:00Z",
+  "Bélgica|Irán":"2026-06-21T22:00Z",
+  "Egipto|Nueva Zelanda":"2026-06-22T01:00Z",
+  "España|Arabia Saudita":"2026-06-21T22:00Z",
+  "Cabo Verde|Uruguay":"2026-06-22T01:00Z",
+  "Francia|Irak":"2026-06-22T19:00Z",
+  "Senegal|Noruega":"2026-06-23T01:00Z",
+  "Argentina|Austria":"2026-06-22T22:00Z",
+  "Argelia|Jordania":"2026-06-23T01:00Z",
+  "Portugal|Uzbekistán":"2026-06-23T22:00Z",
+  "R.D. del Congo|Colombia":"2026-06-24T01:00Z",
+  "Inglaterra|Ghana":"2026-06-23T20:00Z",
+  "Croacia|Panamá":"2026-06-24T00:00Z",
+  "México|Rep. Checa":"2026-06-25T02:00Z",
+  "Sudáfrica|Corea del Sur":"2026-06-25T02:00Z",
+  "Canadá|Suiza":"2026-06-24T19:00Z",
+  "Bosnia-Herz.|Qatar":"2026-06-24T19:00Z",
+  "Brasil|Escocia":"2026-06-25T01:00Z",
+  "Marruecos|Haití":"2026-06-24T22:00Z",
+  "EE.UU.|Turquía":"2026-06-26T01:00Z",
+  "Paraguay|Australia":"2026-06-26T01:00Z",
+  "Alemania|Ecuador":"2026-06-25T22:00Z",
+  "Curazao|Costa de Marfil":"2026-06-25T19:00Z",
+  "Países Bajos|Túnez":"2026-06-25T22:00Z",
+  "Japón|Suecia":"2026-06-25T19:00Z",
+  "Bélgica|Nueva Zelanda":"2026-06-27T23:00Z",
+  "Egipto|Irán":"2026-06-27T23:00Z",
+  "España|Uruguay":"2026-06-27T19:00Z",
+  "Cabo Verde|Arabia Saudita":"2026-06-27T19:00Z",
+  "Francia|Noruega":"2026-06-26T19:00Z",
+  "Senegal|Irak":"2026-06-26T19:00Z",
+  "Argentina|Jordania":"2026-06-28T01:00Z",
+  "Argelia|Austria":"2026-06-28T01:00Z",
+  "Portugal|Colombia":"2026-06-27T22:00Z",
+  "R.D. del Congo|Uzbekistán":"2026-06-27T22:00Z",
+  "Inglaterra|Panamá":"2026-06-27T20:00Z",
+  "Croacia|Ghana":"2026-06-27T20:00Z"
+};
+
 const TEAM_MAP = {
-  // TheSportsDB usa nombres en inglés → grafía de las plantillas
+  // ESPN + TheSportsDB → grafía de las plantillas
   "South Korea":"Corea del Sur", "Korea Republic":"Corea del Sur",
   "Czech Republic":"Rep. Checa", "Czechia":"Rep. Checa",
   "Mexico":"México", "South Africa":"Sudáfrica",
@@ -721,7 +802,7 @@ const TEAM_MAP = {
   "Qatar":"Qatar", "Switzerland":"Suiza",
   "Brazil":"Brasil", "Morocco":"Marruecos",
   "Haiti":"Haití", "Scotland":"Escocia",
-  "Australia":"Australia", "Turkey":"Turquía", "Türkiye":"Turquía",
+  "Australia":"Australia", "Turkey":"Turquía", "Türkiye":"Turquía", "Turkiye":"Turquía",
   "Germany":"Alemania", "Curacao":"Curazao", "Curaçao":"Curazao",
   "Netherlands":"Países Bajos", "Japan":"Japón",
   "Ivory Coast":"Costa de Marfil", "Cote d'Ivoire":"Costa de Marfil",
@@ -733,8 +814,8 @@ const TEAM_MAP = {
   "Saudi Arabia":"Arabia Saudita", "Uruguay":"Uruguay",
   "France":"Francia", "Senegal":"Senegal", "Iraq":"Irak",
   "Norway":"Noruega", "Argentina":"Argentina", "Algeria":"Argelia",
-  "Portugal":"Portugal", "DR Congo":"R.D. del Congo",
-  "Congo DR":"R.D. del Congo", "Democratic Republic of Congo":"R.D. del Congo",
+  "Portugal":"Portugal", "DR Congo":"R.D. del Congo", "Congo DR":"R.D. del Congo",
+  "Congo DR ":"R.D. del Congo", "Democratic Republic of Congo":"R.D. del Congo",
   "Uzbekistan":"Uzbekistán", "Colombia":"Colombia",
   "England":"Inglaterra", "Croatia":"Croacia",
   "Austria":"Austria", "Jordan":"Jordania",
@@ -769,8 +850,7 @@ function loadCache() {
 }
 function saveCache(matches) {
   try {
-    // Caché ACUMULATIVO: fusiona lo nuevo con lo ya guardado.
-    // Lo que apareció una vez con marcador queda fijado para siempre.
+    // Caché que acumula y distingue FINAL de EN VIVO. Formato unificado.
     let prev = [];
     try {
       const raw = localStorage.getItem(CACHE_KEY);
@@ -778,24 +858,28 @@ function saveCache(matches) {
     } catch(e) {}
 
     const byKey = {};
-    const keyOf = e => `${(e.strHomeTeam||'').trim()}|${(e.strAwayTeam||'').trim()}`;
-    const hasScore = e => e.intHomeScore !== null && e.intHomeScore !== undefined && e.intHomeScore !== '';
+    const keyOf = e => `${(e.home||'').trim()}|${(e.away||'').trim()}`;
+    const hasScore = e => e.hs !== null && e.hs !== undefined;
+    const isFinal = e => e.status === 'FINISHED';
 
-    // Primero lo previo (lo ya guardado)
-    for (const e of prev) { if (e && e.strHomeTeam) byKey[keyOf(e)] = e; }
-    // Luego lo nuevo: solo sobrescribe si trae marcador o si no existía
+    for (const e of prev) { if (e && e.home) byKey[keyOf(e)] = e; }
+
     for (const e of matches) {
-      if (!e || !e.strHomeTeam) continue;
+      if (!e || !e.home) continue;
       const k = keyOf(e);
       const old = byKey[k];
-      // No pisar un partido CON marcador con uno SIN marcador
-      if (old && hasScore(old) && !hasScore(e)) continue;
+      if (!old) { byKey[k] = e; continue; }
+      if (isFinal(old) && hasScore(old)) continue;          // final ya fijado
+      if (isFinal(e) && hasScore(e)) { byKey[k] = e; continue; }  // nuevo final gana
+      if (hasScore(e)) { byKey[k] = e; continue; }           // en vivo más reciente
+      if (hasScore(old)) continue;
       byKey[k] = e;
     }
 
     localStorage.setItem(CACHE_KEY, JSON.stringify({ matches: Object.values(byKey), ts: Date.now() }));
   } catch(e) {}
 }
+
 function fmtTime(ts) {
   return new Date(ts).toLocaleTimeString('es-VE', {hour:'2-digit', minute:'2-digit', timeZone:'America/Caracas'});
 }
@@ -806,76 +890,91 @@ const SDB_KEY = '123';
 const SDB_LEAGUE = '4429';   // FIFA World Cup
 const SDB_SEASON = '2026';
 
-// Fechas de la fase de grupos del Mundial 2026 (11 jun – 27 jun)
-const SDB_DAYS = [
-  '2026-06-11','2026-06-12','2026-06-13','2026-06-14','2026-06-15',
-  '2026-06-16','2026-06-17','2026-06-18','2026-06-19','2026-06-20',
-  '2026-06-21','2026-06-22','2026-06-23','2026-06-24','2026-06-25',
-  '2026-06-26','2026-06-27'
-];
+// ════════════════════════════════════════════════════════════
+//  FUENTES DE DATOS:  ESPN (principal) + TheSportsDB (respaldo)
+// ════════════════════════════════════════════════════════════
+// Ambas son gratuitas, sin API key y permiten CORS desde el navegador.
+// Producen un array común de eventos: {home, away, hs, as, status, utc}
+//   status: 'FINISHED' | 'IN_PLAY' | 'SCHEDULED'
 
-async function fetchSportsDB() {
-  const base = `https://www.thesportsdb.com/api/v1/json/${SDB_KEY}`;
-  const bust = Date.now();
-  let merged = {};
-  let gotAny = false;
-  let lastError = '';
-
-  const keyOf = e => `${(e.strHomeTeam||'').trim()}|${(e.strAwayTeam||'').trim()}`;
-  const hasScore = e => e.intHomeScore !== null && e.intHomeScore !== undefined && e.intHomeScore !== '';
-
-  function absorb(ev) {
-    for (const e of ev) {
-      if (!e || !e.strHomeTeam) continue;
-      // Si el evento declara liga y NO es el Mundial (4429), ignorarlo
-      if (e.idLeague && String(e.idLeague) !== String(SDB_LEAGUE)) continue;
-      const k = keyOf(e);
-      if (!merged[k] || (hasScore(e) && !merged[k]._score)) {
-        merged[k] = { ...e, _score: hasScore(e) };
-      }
-    }
+// --- ESPN ---
+async function fromESPN() {
+  const url = 'https://site.api.espn.com/apis/site/v2/sports/soccer/fifa.world/scoreboard?limit=300&dates=20260611-20260628';
+  const r = await fetch(url, { cache: 'no-store' });
+  const j = await r.json();
+  const out = [];
+  for (const ev of (j.events || [])) {
+    const comp = (ev.competitions && ev.competitions[0]) || null;
+    if (!comp) continue;
+    const home = comp.competitors.find(c => c.homeAway === 'home');
+    const away = comp.competitors.find(c => c.homeAway === 'away');
+    if (!home || !away) continue;
+    const stName = ((ev.status && ev.status.type) || {}).name || '';
+    let status = 'SCHEDULED';
+    if (stName === 'STATUS_FULL_TIME' || (ev.status.type.completed === true)) status = 'FINISHED';
+    else if (stName === 'STATUS_FIRST_HALF' || stName === 'STATUS_SECOND_HALF' ||
+             stName === 'STATUS_HALFTIME' || stName === 'STATUS_IN_PROGRESS' ||
+             stName === 'STATUS_OVERTIME' || (ev.status.type.state === 'in')) status = 'IN_PLAY';
+    const hs = (status !== 'SCHEDULED' && home.score != null && home.score !== '') ? parseInt(home.score) : null;
+    const as = (status !== 'SCHEDULED' && away.score != null && away.score !== '') ? parseInt(away.score) : null;
+    out.push({
+      home: home.team.displayName, away: away.team.displayName,
+      hs, as, status, utc: ev.date || null
+    });
   }
+  return out;
+}
 
-  // 1) Endpoints "globales" rápidos (1 sola llamada cada uno) como base
-  const globalUrls = [
+// --- TheSportsDB (respaldo) ---
+async function fromSportsDB() {
+  const base = 'https://www.thesportsdb.com/api/v1/json/' + SDB_KEY;
+  const bust = Date.now();
+  const urls = [
     `${base}/eventsround.php?id=${SDB_LEAGUE}&r=1&s=${SDB_SEASON}&_=${bust}`,
-    `${base}/eventsseason.php?id=${SDB_LEAGUE}&s=${SDB_SEASON}&_=${bust}`,
     `${base}/eventspastleague.php?id=${SDB_LEAGUE}&_=${bust}`,
     `${base}/eventsnextleague.php?id=${SDB_LEAGUE}&_=${bust}`,
   ];
-  for (const url of globalUrls) {
+  const out = [];
+  for (const url of urls) {
     try {
       const r = await fetch(url, { cache: 'no-store' });
       const j = await r.json();
       const ev = Array.isArray(j.events) ? j.events : [];
-      if (ev.length) { gotAny = true; absorb(ev); }
-    } catch(err) { lastError = err.message; }
+      for (const e of ev) {
+        if (!e || !e.strHomeTeam) continue;
+        if (e.idLeague && String(e.idLeague) !== String(SDB_LEAGUE)) continue;
+        const st = (e.strStatus || '').toUpperCase();
+        let status = 'SCHEDULED';
+        if (['FT','AET','PEN','MATCH FINISHED'].includes(st)) status = 'FINISHED';
+        else if (['1H','2H','HT','LIVE','ET'].includes(st)) status = 'IN_PLAY';
+        const has = e.intHomeScore !== null && e.intHomeScore !== undefined && e.intHomeScore !== '';
+        out.push({
+          home: e.strHomeTeam, away: e.strAwayTeam,
+          hs: has ? parseInt(e.intHomeScore) : null,
+          as: has ? parseInt(e.intAwayScore) : null,
+          status, utc: e.strTimestamp ? (e.strTimestamp.includes('Z') ? e.strTimestamp : e.strTimestamp + 'Z') : null
+        });
+      }
+    } catch(err) {}
   }
+  return out;
+}
 
-  // 2) Día por día (eventsday) — trae los partidos completos de cada fecha.
-  //    Se filtran solo los del Mundial (idLeague 4429) para no mezclar otras ligas.
-  const dayResults = await Promise.allSettled(
-    SDB_DAYS.map(d =>
-      fetch(`${base}/eventsday.php?d=${d}&l=${SDB_LEAGUE}&_=${bust}`, { cache: 'no-store' })
-        .then(r => r.json())
-    )
-  );
-  for (const res of dayResults) {
-    if (res.status === 'fulfilled') {
-      const ev = Array.isArray(res.value.events) ? res.value.events : [];
-      if (ev.length) { gotAny = true; absorb(ev); }
-    }
-  }
-
-  if (gotAny) return { events: Object.values(merged), error: '' };
-  return { events: null, error: lastError || 'Sin datos' };
+// Combina ambas fuentes priorizando datos FINALES y con marcador
+async function fetchAllSources() {
+  const results = await Promise.allSettled([fromESPN(), fromSportsDB()]);
+  let espnEvents = results[0].status === 'fulfilled' ? results[0].value : [];
+  let sdbEvents  = results[1].status === 'fulfilled' ? results[1].value : [];
+  const gotAny = (espnEvents.length + sdbEvents.length) > 0;
+  // ESPN primero (más completo), luego SportsDB rellena lo que falte
+  return { events: [...espnEvents, ...sdbEvents], error: gotAny ? '' : 'Ninguna fuente respondió' };
 }
 
 async function fetchResults() {
   setStatus('loading', 'Consultando resultados del Mundial…');
   const cache = loadCache();
 
-  // 1) Si hay caché, muéstralo de inmediato (carga instantánea)
+  // Mostrar caché de inmediato si existe (carga rápida)
   if (cache && Array.isArray(cache.matches) && cache.matches.length) {
     processMatches(cache.matches);
     const played = results.filter(r=>r&&r.gl!==null).length;
@@ -886,8 +985,8 @@ async function fetchResults() {
     document.getElementById('loading').classList.add('hidden');
   }
 
-  // 2) SIEMPRE consultar la API en busca de datos frescos (aunque haya caché)
-  const { events, error } = await fetchSportsDB();
+  // Siempre consultar fuentes frescas
+  const { events, error } = await fetchAllSources();
 
   if (events && events.length) {
     saveCache(events);
@@ -898,10 +997,9 @@ async function fetchResults() {
     document.getElementById('last-update').textContent = `· Última consulta: ${now}`;
     hideError();
   } else if (cache && Array.isArray(cache.matches) && cache.matches.length) {
-    // API falló pero ya mostramos el caché arriba → solo ajustar el aviso
     const played = results.filter(r=>r&&r.gl!==null).length;
     setStatus('ok', `Mostrando últimos datos (${fmtTime(cache.ts)}) — ${played} con marcador`);
-    document.getElementById('last-update').textContent = `· La fuente no respondió; reintenta en unos minutos`;
+    document.getElementById('last-update').textContent = `· Las fuentes no respondieron; reintenta en unos minutos`;
     hideError();
   } else {
     for (let i = 0; i < 72; i++) results[i] = { gl:null, gv:null, status:'SCHEDULED', utc:null };
@@ -913,41 +1011,43 @@ async function fetchResults() {
 }
 
 function processMatches(events) {
-  // Construir mapa por AMBOS sentidos: "LOCAL|VISITANTE" y "VISITANTE|LOCAL"
-  // Algunos partidos vienen con local/visitante invertidos respecto a la plantilla.
+  // events: array unificado {home, away, hs, as, status, utc}
+  // Mapa bidireccional: cada partido se indexa como "A|B" y "B|A" (volteado)
   const apiMap = {};
   for (const e of events) {
-    const a = mapTeam((e.strHomeTeam || '').trim());
-    const b = mapTeam((e.strAwayTeam || '').trim());
-    const st = (e.strStatus || '').toUpperCase();
-    let status = 'SCHEDULED', gh = null, ga = null;
-    const hasScore = e.intHomeScore !== null && e.intHomeScore !== undefined && e.intHomeScore !== '';
-    if (['FT','AET','PEN','MATCH FINISHED'].includes(st)) {
-      status = 'FINISHED';
-      if (hasScore) { gh = parseInt(e.intHomeScore); ga = parseInt(e.intAwayScore); }
-    } else if (['1H','2H','HT','LIVE','ET','P','BT'].includes(st)) {
-      status = 'IN_PLAY';
-      if (hasScore) { gh = parseInt(e.intHomeScore); ga = parseInt(e.intAwayScore); }
-    } else {
-      if (hasScore) { gh = parseInt(e.intHomeScore); ga = parseInt(e.intAwayScore); if (gh !== null) status = 'FINISHED'; }
-    }
-    let utc = null;
-    if (e.strTimestamp) utc = e.strTimestamp.includes('Z') ? e.strTimestamp : e.strTimestamp + 'Z';
+    const a = mapTeam((e.home || '').trim());
+    const b = mapTeam((e.away || '').trim());
+    if (!a || !b) continue;
 
-    // Guardar en sentido normal (a vs b)
-    apiMap[`${a}|${b}`] = { gl: gh, gv: ga, status, utc, flip: false };
-    // Y en sentido invertido (b vs a) con marcador volteado
-    apiMap[`${b}|${a}`] = { gl: ga, gv: gh, status, utc, flip: true };
+    const candidate = { gl: e.hs, gv: e.as, status: e.status, utc: e.utc };
+
+    // Guardar sentido normal — preferir el que tenga MÁS info (final > en vivo > programado)
+    const rank = s => s==='FINISHED'?3 : s==='IN_PLAY'?2 : 1;
+    const keyN = `${a}|${b}`, keyI = `${b}|${a}`;
+
+    const existN = apiMap[keyN];
+    if (!existN || rank(candidate.status) >= rank(existN.status)) {
+      apiMap[keyN] = { ...candidate, flip:false };
+    }
+    const existI = apiMap[keyI];
+    const flipped = { gl: e.as, gv: e.hs, status: e.status, utc: e.utc, flip:true };
+    if (!existI || rank(flipped.status) >= rank(existI.status)) {
+      apiMap[keyI] = flipped;
+    }
   }
 
-  // Emparejar con los 72 partidos canónicos, en el orden de la plantilla
   for (let i = 0; i < PARTIDOS.length; i++) {
     const p = PARTIDOS[i];
     const r = apiMap[`${p.loc}|${p.vis}`];
+    // Hora oficial de respaldo (si la fuente no trae utc)
+    const fallbackUtc = (typeof KICKOFFS !== 'undefined') ? KICKOFFS[`${p.loc}|${p.vis}`] : null;
     if (r) {
-      results[i] = { gl: r.gl, gv: r.gv, status: r.status, utc: r.utc };
+      results[i] = {
+        gl: r.gl, gv: r.gv, status: r.status,
+        utc: r.utc || fallbackUtc || null
+      };
     } else {
-      results[i] = { gl: null, gv: null, status: 'SCHEDULED', utc: null };
+      results[i] = { gl: null, gv: null, status: 'SCHEDULED', utc: fallbackUtc || null };
     }
   }
 }
@@ -1063,9 +1163,18 @@ function renderMatches() {
       scoreHtml = `<div class="match-score">${r.gl} - ${r.gv}</div>`;
       chipHtml  = `<span class="status-chip chip-pend">Parcial</span>`;
     } else {
-      scoreHtml = `<div class="match-score pending">vs</div>`;
-      const hora = matchTime(r && r.utc);
-      chipHtml  = `<span class="status-chip chip-pend">${formatDate(p.fecha)}${hora ? ' · ' + hora : ''}</span>`;
+      // Sin marcador: ¿ya pasó la hora del partido + 1h? → "esperando dato del servidor"
+      const kref = r && r.utc;
+      const kickoffMs = kref ? Date.parse(kref) : NaN;
+      const yaPaso = !isNaN(kickoffMs) && (Date.now() > kickoffMs + 60*60*1000);
+      if (yaPaso) {
+        scoreHtml = `<div class="match-score waiting">⏳</div>`;
+        chipHtml  = `<span class="status-chip chip-wait">Esperando resultado del proveedor</span>`;
+      } else {
+        scoreHtml = `<div class="match-score pending">vs</div>`;
+        const hora = matchTime(kref);
+        chipHtml  = `<span class="status-chip chip-pend">${formatDate(p.fecha)}${hora ? ' · ' + hora : ''}</span>`;
+      }
     }
 
     return `
